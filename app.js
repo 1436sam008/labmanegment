@@ -648,5 +648,57 @@ initFirebaseIfPossible();
     if(window.innerWidth > 980 && sidebar.classList.contains('open')) closeSidebar();
   });
 })();
+// === Ensure only one view shows and re-hook sidebar nav clicks ===
+(function ensureSingleActiveView() {
+  // fix: if some views accidentally had "active" set multiple times, normalize
+  const views = Array.from(document.querySelectorAll('.view'));
+  if (views.length === 0) return; // nothing to do
+
+  // Remove extra .active flags, keep only dashboard if multiple active
+  const activeViews = views.filter(v => v.classList.contains('active'));
+  if (activeViews.length === 0) {
+    // nothing active — show dashboard by default
+    const dash = document.getElementById('view-dashboard');
+    if (dash) dash.classList.add('active');
+  } else if (activeViews.length > 1) {
+    // multiple active: clear all and activate dashboard (or first active)
+    views.forEach(v => v.classList.remove('active'));
+    const dash = document.getElementById('view-dashboard') || views[0];
+    dash.classList.add('active');
+  }
+
+  // Re-hook navigation buttons to ensure switchView is used
+  const sidebarNav = document.getElementById('sidebarNav');
+  if (sidebarNav) {
+    // remove existing listeners by cloning (safe) then re-attach a single handler
+    const navClone = sidebarNav.cloneNode(true);
+    sidebarNav.parentNode.replaceChild(navClone, sidebarNav);
+
+    navClone.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button[data-view]');
+      if (!btn) return;
+      // highlight nav button
+      navClone.querySelectorAll('button[data-view]').forEach(b => b.classList.toggle('active', b === btn));
+      // hide all views and show the requested one
+      const viewName = btn.getAttribute('data-view');
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const target = document.getElementById('view-' + viewName);
+      if (target) target.classList.add('active');
+      // preserve any existing function you rely on:
+      if (typeof switchView === 'function') {
+        try { switchView(viewName); } catch(e) { /* ignore if not usable */ }
+      }
+      // scroll top on small screens for UX
+      window.scrollTo(0,0);
+    });
+  }
+
+  // Finally ensure dashboard active (explicit)
+  const dash = document.getElementById('view-dashboard');
+  if (dash) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    dash.classList.add('active');
+  }
+})();
 
 // End of app.js
