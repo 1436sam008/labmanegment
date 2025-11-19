@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lab Reserve — Lab Manager</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase (compat) scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand" style="position:relative; padding-right:36px;">
+        <div class="logo">LR</div>
+        <div>
+          <h2>Lab Reserve</h2>
+          <small class="brand-sub">Seat Reservation</small>
+        </div>
+        <button id="sidebarClose" aria-label="Close menu" class="sidebar-close">✕</button>
+      </div>
+
+      <nav class="nav" id="sidebarNav">
+        <button class="active" data-view="dashboard">Dashboard</button>
+        <button data-view="students">Student Profiles</button>
+        <button data-view="reminders">Reminder Trackers</button>
+        <button data-view="payments">Payment Records</button>
+        <button data-view="shifts">Shift Config</button>
+      </nav>
+
+      <div class="sidebar-footer">Manager: <strong id="mgrName">Admin</strong></div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <button class="mobile-menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+
+        <div class="search">
+          <input id="q" placeholder="Search students by name or mobile" />
+          <div class="sep">|</div>
+          <div class="today">Today: <span id="today"></span></div>
+        </div>
+
+        <div class="actions">
+          <div id="userStatus" class="small status">Firebase: initializing...</div>
+          <button class="btn ghost" id="btnAuth">Sign in</button>
+          <button class="btn ghost" id="btnSaveCloud">Save Cloud</button>
+          <button class="btn ghost" id="btnLoadCloud">Load Cloud</button>
+          <button class="btn ghost" id="importBtn">Import</button>
+          <button class="btn ghost" id="exportBtn">Export</button>
+          <button class="btn" id="addBtn">Add Student</button>
+        </div>
+      </div>
+
+      <!-- Views -->
+      <section id="view-dashboard" class="view active">
+        <div class="grid">
+          <div class="stats card">
+            <div class="stat purple">
+              <div class="label">Total Amount Paid</div>
+              <div class="value" id="statPaid">₹ 0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total Monthly Fees</div>
+              <div class="value" id="statMonthly">₹ 0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total Students</div>
+              <div class="value" id="statStudents">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Reminders Today</div>
+              <div class="value" id="statReminders">0</div>
+            </div>
+          </div>
+
+          <div class="panel-left card">
+            <div class="panel-header">
+              <h3>Students</h3>
+              <div class="filters">
+                <select id="filterPaid"><option value="all">All</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
+                <select id="filterShift"><option value="all">All Shifts</option><option value="half-7-15">Half A (7-15)</option><option value="half-15-22">Half B (15-22)</option><option value="full-7-22">Full (7-22)</option></select>
+              </div>
+            </div>
+
+            <div class="shifts">
+              <div class="shift" style="background:#f0f9f4"><div><div class="count" id="countA">0</div><div class="text">Half-time Shift A</div></div></div>
+              <div class="shift" style="background:#fff6f6"><div><div class="count" id="countB">0</div><div class="text">Half-time Shift B</div></div></div>
+              <div class="shift" style="background:#eef7ff"><div><div class="count" id="countFull">0</div><div class="text">Full-time</div></div></div>
+              <div class="shift" style="background:#fff9ed"><div><div class="count" id="countTotal">0</div><div class="text">Total Seats</div></div></div>
+            </div>
+
+            <div class="table-wrap">
+              <table id="studentsTable">
+                <thead><tr><th>Name</th><th>Shift</th><th>Fee</th><th>Status</th><th>Next Due</th><th>Joined</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside class="panel-right card manager">
+            <h4>Manager Panel</h4>
+            <div class="item reminders">
+              <div>
+                <div class="bold">Reminders</div>
+                <div class="small" id="reminderList">No reminders today</div>
+              </div>
+              <div><button class="btn" id="collectAll">Collect</button></div>
+            </div>
+
+            <div class="item">
+              <div>
+                <div class="bold">Trash</div>
+                <div class="small" id="trashCount">0 removed</div>
+              </div>
+              <div><button class="btn ghost" id="openTrash">Open</button></div>
+            </div>
+
+            <div class="item">
+              <div>
+                <div class="bold">Reports</div>
+                <div class="small">Monthly CSV & Summary</div>
+              </div>
+              <div class="report-actions">
+                <button class="btn" id="monthlyReport">CSV</button>
+                <button class="btn ghost" id="summaryReport">Summary</button>
+              </div>
+            </div>
+
+            <footer>Tip: This app stores data locally. Use Export to backup.</footer>
+          </aside>
+        </div>
+      </section>
+
+      <!-- Students view -->
+      <section id="view-students" class="view">
+        <div class="card">
+          <h3>Student Profiles</h3>
+          <div style="margin-top:8px">
+            <table id="studentsTable_studentsView">
+              <thead><tr><th>Name</th><th>Phone</th><th>Shift</th><th>Fee</th><th>Next Due</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reminders view -->
+      <section id="view-reminders" class="view">
+        <div class="card">
+          <h3>Reminders This Month</h3>
+          <div id="remindersListContainer" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <!-- Payments view -->
+      <section id="view-payments" class="view">
+        <div class="card">
+          <h3>Payments</h3>
+          <div id="paymentsListContainer" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <!-- Shifts -->
+      <section id="view-shifts" class="view">
+        <div class="card">
+          <h3>Shift Configuration</h3>
+          <div style="margin-top:12px">
+            <div><strong>Half A (7:00-15:00)</strong></div>
+            <div><strong>Half B (15:00-22:00)</strong></div>
+            <div><strong>Full (7:00-22:00)</strong></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+
+  <!-- Sign-in modal template will be created by JS when needed -->
+
+  <script src="app.js"></script>
+</body>
+</html>
